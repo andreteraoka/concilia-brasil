@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
-import { analyzeWithAI } from "./ai";
+import { analyzeWithAI, validateSemanticPostOcr } from "./ai";
 import { uploadArtifacts } from "./blob";
 import { extractDocument } from "./extractor";
 import { validateOutput } from "./schema";
@@ -87,6 +87,16 @@ function createBaseOutput(input: {
       pixKey: null,
       nfAccessKey: null,
     },
+    semanticValidation: {
+      is_valid: false,
+      confidence_overall: 0,
+      normalized: {
+        currency: "BRL",
+        transactions: [],
+      },
+      issues: [],
+      needs_human_review: true,
+    },
     azure: {
       blobJsonUrl: null,
       blobOriginalUrl: null,
@@ -125,6 +135,23 @@ async function processFile(filePath: string, options: IngestOptions) {
   baseOutput.classification = ai.classification;
   baseOutput.fields = ai.fields;
   baseOutput.errors.push(...ai.errors);
+
+  const semantic = await validateSemanticPostOcr({
+    ocrJson: {
+      method: extraction.method,
+      text: extraction.text,
+      pages: extraction.pages,
+    },
+    documentMeta: {
+      fileName,
+      mimeType,
+      sha256,
+    },
+    extractionText: extraction.text,
+  });
+
+  baseOutput.semanticValidation = semantic.semanticValidation;
+  baseOutput.errors.push(...semantic.errors);
 
   const outputFilePath = path.resolve(options.output, `${sha256}_${safeName}.json`);
   baseOutput.timestamps.processedAt = nowIso();

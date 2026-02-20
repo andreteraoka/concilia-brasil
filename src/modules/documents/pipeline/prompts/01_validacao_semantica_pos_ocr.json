@@ -1,0 +1,66 @@
+{
+  "name": "01_validacao_semantica_pos_ocr",
+  "description": "Valida e normaliza a extração do OCR para documentos financeiros, detectando inconsistências e calculando confiança.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "ocr_json": { "type": "object" },
+      "document_meta": { "type": "object" }
+    },
+    "required": ["ocr_json"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "is_valid": { "type": "boolean" },
+      "confidence_overall": { "type": "number" },
+      "normalized": {
+        "type": "object",
+        "properties": {
+          "bank_name": { "type": "string" },
+          "account_last4": { "type": "string" },
+          "currency": { "type": "string" },
+          "period_start": { "type": "string" },
+          "period_end": { "type": "string" },
+          "opening_balance": { "type": "number" },
+          "closing_balance": { "type": "number" },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "type": "string" },
+                "description": { "type": "string" },
+                "amount": { "type": "number" },
+                "type": { "type": "string", "enum": ["CREDIT", "DEBIT"] },
+                "category_guess": { "type": "string" },
+                "confidence": { "type": "number" }
+              },
+              "required": ["date", "description", "amount", "type"]
+            }
+          }
+        },
+        "required": ["currency", "transactions"]
+      },
+      "issues": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" }
+          },
+          "required": ["code"]
+        }
+      },
+      "needs_human_review": { "type": "boolean" }
+    },
+    "required": ["is_valid", "normalized", "needs_human_review"]
+  },
+  "prompt_template": "Você é um auditor financeiro especializado em validar extrações de OCR.\nReceba o JSON bruto do OCR (Azure Document Intelligence) e:\n1) Detecte inconsistências (soma de créditos/débitos vs. saldos; datas fora do período; campos ausentes).\n2) Normalize os campos para o schema alvo (abaixo).\n3) Atribua \"confidence_overall\" (0–1) e \"confidence\" por transação.\n4) Liste \"issues\" com códigos padronizados e defina \"needs_human_review\".\n\nSchema alvo:\n- bank_name, account_last4, currency (ISO), period_start/end (YYYY-MM-DD),\n  opening_balance, closing_balance, transactions[date, description, amount, type, category_guess, confidence].\n\nRegras:\n- Assuma moeda BRL se ausente.\n- Corrija sinais: crédito = positivo; débito = negativo.\n- NÃO invente valores: se ausente, registre issue MISSING_FIELD.\n- Em conflitos numéricos, prefira saldos totais e sinalize BALANCE_MISMATCH.\n\nEntrada:\n- ocr_json: {{ocr_json}}\n- document_meta: {{document_meta}}\n\nSaída: UM ÚNICO objeto JSON válido conforme o schema. Não inclua texto fora do JSON.",
+  "parameters": {
+    "temperature": 0.1,
+    "top_p": 0.1,
+    "max_tokens": 1800
+  }
+}

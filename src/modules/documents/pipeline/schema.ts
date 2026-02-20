@@ -39,6 +39,36 @@ export const outputSchema = z.object({
     pixKey: z.string().nullable(),
     nfAccessKey: z.string().nullable(),
   }),
+  semanticValidation: z.object({
+    is_valid: z.boolean(),
+    confidence_overall: z.number().min(0).max(1),
+    normalized: z.object({
+      bank_name: z.string().optional(),
+      account_last4: z.string().optional(),
+      currency: z.string().min(1),
+      period_start: z.string().optional(),
+      period_end: z.string().optional(),
+      opening_balance: z.number().optional(),
+      closing_balance: z.number().optional(),
+      transactions: z.array(
+        z.object({
+          date: z.string(),
+          description: z.string(),
+          amount: z.number(),
+          type: z.enum(["CREDIT", "DEBIT"]),
+          category_guess: z.string().nullable(),
+          confidence: z.number().min(0).max(1),
+        })
+      ),
+    }),
+    issues: z.array(
+      z.object({
+        code: z.string().min(1),
+        message: z.string().optional(),
+      })
+    ),
+    needs_human_review: z.boolean(),
+  }),
   azure: z.object({
     blobJsonUrl: z.string().nullable(),
     blobOriginalUrl: z.string().nullable(),

@@ -45,6 +45,37 @@ export type FieldsOutput = {
   nfAccessKey: string | null;
 };
 
+export type SemanticValidationTransaction = {
+  date: string;
+  description: string;
+  amount: number;
+  type: "CREDIT" | "DEBIT";
+  category_guess: string | null;
+  confidence: number;
+};
+
+export type SemanticValidationIssue = {
+  code: string;
+  message?: string;
+};
+
+export type SemanticValidationOutput = {
+  is_valid: boolean;
+  confidence_overall: number;
+  normalized: {
+    bank_name?: string;
+    account_last4?: string;
+    currency: string;
+    period_start?: string;
+    period_end?: string;
+    opening_balance?: number;
+    closing_balance?: number;
+    transactions: SemanticValidationTransaction[];
+  };
+  issues: SemanticValidationIssue[];
+  needs_human_review: boolean;
+};
+
 export type PipelineOutput = {
   id: string;
   source: {
@@ -61,6 +92,7 @@ export type PipelineOutput = {
   };
   classification: ClassificationOutput;
   fields: FieldsOutput;
+  semanticValidation: SemanticValidationOutput;
   azure: {
     blobJsonUrl: string | null;
     blobOriginalUrl: string | null;

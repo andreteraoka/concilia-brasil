@@ -42,6 +42,16 @@ describe("pipeline schema", () => {
         pixKey: null,
         nfAccessKey: null,
       },
+      semanticValidation: {
+        is_valid: false,
+        confidence_overall: 0.2,
+        normalized: {
+          currency: "BRL",
+          transactions: [],
+        },
+        issues: [{ code: "MISSING_FIELD" }],
+        needs_human_review: true,
+      },
       azure: {
         blobJsonUrl: null,
         blobOriginalUrl: null,

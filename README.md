@@ -445,7 +445,14 @@ Saída por arquivo:
 - `txt/csv` são processados localmente
 - `pdf/imagem` registram warning de OCR não configurado
 - classificação cai para heurística (`OUTRO` quando necessário)
+- validação semântica pós-OCR roda em fallback e marca `needs_human_review`
 - pipeline não quebra o lote inteiro
+
+### Prompt semântico pós-OCR
+
+- Arquivo: `src/modules/documents/pipeline/prompts/01_validacao_semantica_pos_ocr.json`
+- Objetivo: validar consistência financeira após OCR e normalizar transações com confiança
+- Resultado no output: seção `semanticValidation`
 
 ### Workflow GitHub Actions
 
