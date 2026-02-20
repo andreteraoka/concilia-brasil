@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  cnpj        String
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  users       User[]
+  documents   Document[]
+  accounts    Account[]
+  transactions Transaction[]
+}
+
+model User {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  role        String
+  status      String   @default("active") // active | inactive
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Document {
+  id            String   @id @default(uuid())
+  fileName      String
+  fileType      String
+  status        String   @default("uploaded")
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  transactions  Transaction[]
+  createdAt     DateTime @default(now())
+}
+
+
+model ProcessingLog {
+  id          String   @id @default(uuid())
+  stage       String
+  status      String
+  message     String
+  documentId  String?
+  createdAt   DateTime @default(now())
+}
+
+
+model Account {
+  id            String   @id @default(uuid())
+  bankName      String
+  agency        String?
+  accountNumber String
+  type          String
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  transactions  Transaction[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime? // soft delete
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  date        DateTime
+  description String
+  amount      Float
+  type        String   // income | expense
+
+  // relação com documento (opcional)
+  documentId  String?
+  document    Document? @relation(fields: [documentId], references: [id])
+
+  // relação com conta (obrigatória)
+  accountId   String
+  account     Account   @relation(fields: [accountId], references: [id])
+
+  // multi-tenant
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // soft delete
+}
