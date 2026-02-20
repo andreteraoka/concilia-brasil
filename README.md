@@ -416,6 +416,65 @@ Veja [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md) para checklist completo.
 
 ---
 
+## 🧠 Pipeline de Ingestão de Documentos (MVP)
+
+Foi adicionado um pipeline local-first para processar documentos em lote com fallback seguro quando Azure não estiver configurado.
+
+### CLI
+
+```bash
+npm run ingest -- --input ./input --output ./output --upload false
+```
+
+Opções disponíveis:
+
+- `--input <dir>` (default `./input`)
+- `--output <dir>` (default `./output`)
+- `--upload <true|false>` (default `false`)
+- `--upload-original <true|false>` (default `false`)
+- `--max-files <n>`
+- `--concurrency <n>`
+- `--quiet`
+
+Saída por arquivo:
+
+- `./output/<sha256>_<nomeOriginal>.json`
+
+### Comportamento sem Azure
+
+- `txt/csv` são processados localmente
+- `pdf/imagem` registram warning de OCR não configurado
+- classificação cai para heurística (`OUTRO` quando necessário)
+- pipeline não quebra o lote inteiro
+
+### Workflow GitHub Actions
+
+Arquivo: `.github/workflows/ingestion-pipeline.yml`
+
+- Trigger manual via `workflow_dispatch`
+- Trigger opcional por mudanças em `input/**`
+- Executa ingestão exemplo com `--max-files 5`
+- Publica `output/**` como artifact
+
+### Variáveis Azure para habilitar recursos
+
+- Document Intelligence:
+  - `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`
+  - `AZURE_DOCUMENT_INTELLIGENCE_KEY`
+  - `AZURE_DOCUMENT_INTELLIGENCE_API_VERSION`
+- Azure OpenAI:
+  - `AZURE_OPENAI_ENDPOINT`
+  - `AZURE_OPENAI_API_KEY`
+  - `AZURE_OPENAI_DEPLOYMENT`
+  - `AZURE_OPENAI_API_VERSION`
+- Blob Storage (upload opcional):
+  - `AZURE_STORAGE_CONNECTION_STRING`
+  - `AZURE_STORAGE_CONTAINER`
+
+Checklist de provisionamento: [docs/azure-setup.md](docs/azure-setup.md)
+
+---
+
 ## 🛣️ Roadmap Técnico
 
 **Q1 2026**: Produção  
