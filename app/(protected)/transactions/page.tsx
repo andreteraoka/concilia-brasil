@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/src/lib/useAuth";
+import { useAuth } from "@/src/modules/auth/frontend/useAuth";
 
 interface Transaction {
   id: string;

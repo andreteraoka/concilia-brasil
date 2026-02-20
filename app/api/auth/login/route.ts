@@ -15,9 +15,9 @@ export async function POST(req: Request) {
       password: body.password,
     });
 
-    logger.authInfo("User logged in successfully", { userId: data.userId });
+    logger.authInfo("User logged in successfully", { email: body.email });
 
-    const response = apiOk(data);
+    const response = apiOk({ token: data.token });
     response.cookies.set("token", data.token, {
       httpOnly: true,
       sameSite: "lax",

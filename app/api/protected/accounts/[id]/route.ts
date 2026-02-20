@@ -9,13 +9,13 @@ import { logger } from "@/lib/logger";
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await requireRole(["ADMIN", "USER"]);
     if (!auth.ok) return auth.response;
     const { companyId } = auth.context;
-    const { id } = params;
+    const { id } = await params;
 
     const account = await accountService.getById(id, companyId);
     if (!account) {
@@ -32,13 +32,13 @@ export async function GET(
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await requireRole(["ADMIN", "USER"]);
     if (!auth.ok) return auth.response;
     const { companyId } = auth.context;
-    const { id } = params;
+    const { id } = await params;
     
     const body = await validateRequest<UpdateAccountInput>(req, updateAccountSchema);
 
@@ -69,13 +69,13 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await requireRole(["ADMIN", "USER"]);
     if (!auth.ok) return auth.response;
     const { companyId } = auth.context;
-    const { id } = params;
+    const { id } = await params;
 
     // Verify account exists and belongs to company
     const account = await accountService.getById(id, companyId);

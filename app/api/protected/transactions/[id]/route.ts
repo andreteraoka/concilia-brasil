@@ -4,13 +4,13 @@ import { transactionService } from "@/src/modules/transactions/services/transact
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await requireRole(["ADMIN", "USER"]);
     if (!auth.ok) return auth.response;
     const { companyId } = auth.context;
-    const { id } = params;
+    const { id } = await params;
 
     // Verify transaction exists and belongs to company
     const transaction = await transactionService.getById(id, companyId);

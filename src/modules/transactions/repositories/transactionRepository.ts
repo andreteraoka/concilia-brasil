@@ -15,7 +15,7 @@ export const transactionRepository = {
     const limit = options?.limit || 20;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {
+    const where: any = {
       companyId,
       deletedAt: null,
     };
@@ -25,7 +25,7 @@ export const transactionRepository = {
     }
     if (options?.endDate) {
       if (where.date) {
-        where.date.lte = options.endDate;
+        (where.date as any).lte = options.endDate;
       } else {
         where.date = { lte: options.endDate };
       }

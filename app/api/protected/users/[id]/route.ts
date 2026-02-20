@@ -4,13 +4,13 @@ import { requireRole } from "@/src/lib/requireRole";
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await requireRole("ADMIN");
     if (!auth.ok) return auth.response;
     const { companyId } = auth.context;
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
 
     // Verify user exists and belongs to company

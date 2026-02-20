@@ -73,7 +73,7 @@ function sanitizeErrorMessage(error: unknown): string {
 export function handleApiError(
   error: unknown,
   requestId: string = uuidv4()
-): NextResponse<BaseErrorResponse> {
+): NextResponse {
   const timestamp = new Date().toISOString();
   const isDevelopment = process.env.NODE_ENV === "development";
 

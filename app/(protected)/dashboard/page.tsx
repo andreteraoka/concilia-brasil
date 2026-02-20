@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/src/lib/useAuth";
+import { useAuth } from "@/src/modules/auth/frontend/useAuth";
 import {
   LineChart,
   Line,
@@ -242,7 +242,7 @@ export default function DashboardPage() {
                     border: "1px solid #52525b",
                     borderRadius: "8px",
                   }}
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value?: number) => value ? formatCurrency(value) : ''}
                 />
                 <Legend />
                 <Bar dataKey="income" fill="#10b981" name="Receita" />
@@ -275,7 +275,7 @@ export default function DashboardPage() {
                     border: "1px solid #52525b",
                     borderRadius: "8px",
                   }}
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value?: number) => value ? formatCurrency(value) : ''}
                 />
                 <Legend />
                 <Line
