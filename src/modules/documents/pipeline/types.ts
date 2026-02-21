@@ -157,3 +157,21 @@ export type PipelineOutput = {
     processedAt: string;
   };
 };
+
+export type Audience = "CFO" | "Controller" | "Contador" | "Empreendedor";
+export type Tone = "executivo" | "neutro" | "didático";
+export type AlertLevel = "HIGH" | "MEDIUM" | "LOW";
+
+export type ExecutiveInsightAlert = {
+  level: AlertLevel;
+  message: string;
+  recommended_action?: string;
+};
+
+export type ExecutiveInsightsOutput = {
+  headline: string;
+  summary: string;
+  key_points: string[];
+  alerts?: ExecutiveInsightAlert[];
+  one_week_outlook?: string;
+};

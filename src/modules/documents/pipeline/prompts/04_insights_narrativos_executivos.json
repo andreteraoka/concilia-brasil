@@ -1,0 +1,67 @@
+{
+  "name": "04_insights_narrativos_executivos",
+  "description": "Gera um resumo executivo de KPIs financeiros com pontos-chave, alertas e visão de 1 semana.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "kpis": {
+        "type": "object"
+      },
+      "audience": {
+        "type": "string",
+        "enum": ["CFO", "Controller", "Contador", "Empreendedor"]
+      },
+      "tone": {
+        "type": "string",
+        "enum": ["executivo", "neutro", "didático"]
+      }
+    },
+    "required": ["kpis", "audience", "tone"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "headline": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "key_points": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "alerts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "level": {
+              "type": "string",
+              "enum": ["HIGH", "MEDIUM", "LOW"]
+            },
+            "message": {
+              "type": "string"
+            },
+            "recommended_action": {
+              "type": "string"
+            }
+          },
+          "required": ["level", "message"]
+        }
+      },
+      "one_week_outlook": {
+        "type": "string"
+      }
+    },
+    "required": ["headline", "summary", "key_points"]
+  },
+  "prompt_template": "Atue como um analista financeiro sênior. Receba KPIs consolidados do período atual e anterior.\nGere um \"executive brief\" com:\n- headline direta,\n- summary (3–5 frases),\n- key_points objetivos,\n- alerts com nível de severidade e ação recomendada,\n- one_week_outlook (projeção curta de caixa/risco).\n\nContexto:\n- público-alvo: {{audience}},\n- tom: {{tone}},\n- moeda BRL, números em pt-BR (separador de milhar e vírgula decimal),\n- NÃO reescreva números; use os que vierem nos KPIs,\n- NÃO invente dados ausentes.\n\nEntrada (kpis): {{kpis}}\n\nSaída: um único objeto JSON conforme o schema. Sem texto fora do JSON.",
+  "parameters": {
+    "temperature": 0.4,
+    "top_p": 0.9,
+    "max_tokens": 700
+  }
+}

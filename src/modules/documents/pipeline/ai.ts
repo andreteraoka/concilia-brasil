@@ -1,6 +1,7 @@
 import semanticValidationPrompt from "./prompts/01_validacao_semantica_pos_ocr.json";
 import routeClassificationPrompt from "./prompts/02_classificacao_documento.json";
 import structuredSchemaPrompt from "./prompts/03_extracao_estruturada_schema.json";
+import executiveInsightsPrompt from "./prompts/04_insights_narrativos_executivos.json";
 import {
   DOCUMENT_TYPES,
   ClassificationOutput,
@@ -11,6 +12,10 @@ import {
   RouteDocType,
   RouteSecurityFlag,
   StructuredPayloadOutput,
+  ExecutiveInsightsOutput,
+  Audience,
+  Tone,
+  AlertLevel,
 } from "./types";
 
 const EMPTY_FIELDS: FieldsOutput = {
@@ -905,6 +910,162 @@ export async function buildStructuredPayload(input: {
         error instanceof Error
           ? `structured_payload_exception: ${error.message}`
           : "structured_payload_exception",
+      ],
+    };
+  }
+}
+
+function fallbackExecutiveInsights(kpis: unknown): ExecutiveInsightsOutput {
+  return {
+    headline: "Resumo executivo indisponível",
+    summary:
+      "Não foi possível gerar insights executivos automaticamente. Revise manualmente os KPIs consolidados.",
+    key_points: [
+      "Serviço de AI indisponível no momento",
+      "KPIs podem ser consultados diretamente no dashboard",
+    ],
+    alerts: [
+      {
+        level: "MEDIUM",
+        message: "Sistema de insights operando em modo fallback",
+        recommended_action: "Verifique configuração do Azure OpenAI",
+      },
+    ],
+    one_week_outlook: "Projeção não disponível. Consulte analista financeiro.",
+  };
+}
+
+function coerceExecutiveInsights(value: unknown): ExecutiveInsightsOutput {
+  if (!value || typeof value !== "object") {
+    return fallbackExecutiveInsights(null);
+  }
+
+  const payload = value as {
+    headline?: unknown;
+    summary?: unknown;
+    key_points?: unknown;
+    alerts?: unknown;
+    one_week_outlook?: unknown;
+  };
+
+  const headline =
+    typeof payload.headline === "string" ? payload.headline : "Resumo executivo";
+  const summary =
+    typeof payload.summary === "string" ? payload.summary : "Informações não disponíveis.";
+
+  let key_points: string[] = [];
+  if (Array.isArray(payload.key_points)) {
+    key_points = payload.key_points
+      .filter((item) => typeof item === "string")
+      .map((item) => String(item));
+  }
+  if (key_points.length === 0) {
+    key_points = ["Pontos-chave não puderam ser extraídos"];
+  }
+
+  let alerts: ExecutiveInsightsOutput["alerts"] = [];
+  if (Array.isArray(payload.alerts)) {
+    alerts = payload.alerts
+      .filter((item): item is { level?: unknown; message?: unknown; recommended_action?: unknown } =>
+        Boolean(item && typeof item === "object")
+      )
+      .map((alert) => {
+        const level = ["HIGH", "MEDIUM", "LOW"].includes(String(alert.level).toUpperCase())
+          ? (String(alert.level).toUpperCase() as AlertLevel)
+          : "MEDIUM";
+        const message =
+          typeof alert.message === "string" ? alert.message : "Alerta sem descrição";
+        const recommended_action =
+          typeof alert.recommended_action === "string" ? alert.recommended_action : undefined;
+        return { level, message, recommended_action };
+      });
+  }
+
+  const one_week_outlook =
+    typeof payload.one_week_outlook === "string" ? payload.one_week_outlook : undefined;
+
+  return {
+    headline,
+    summary,
+    key_points,
+    alerts,
+    one_week_outlook,
+  };
+}
+
+export async function generateExecutiveInsights(input: {
+  kpis: Record<string, unknown>;
+  audience: Audience;
+  tone: Tone;
+}): Promise<{ insights: ExecutiveInsightsOutput; errors: string[] }> {
+  if (!hasAzureOpenAIConfig()) {
+    return {
+      insights: fallbackExecutiveInsights(input.kpis),
+      errors: ["azure_openai_not_configured"],
+    };
+  }
+
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT!;
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT!;
+  const apiKey = process.env.AZURE_OPENAI_API_KEY!;
+  const apiVersion = process.env.AZURE_OPENAI_API_VERSION!;
+  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+
+  const prompt = executiveInsightsPrompt.prompt_template
+    .replace("{{kpis}}", JSON.stringify(input.kpis, null, 2))
+    .replace("{{audience}}", input.audience)
+    .replace("{{tone}}", input.tone);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify({
+        temperature: executiveInsightsPrompt.parameters.temperature,
+        top_p: executiveInsightsPrompt.parameters.top_p,
+        max_tokens: executiveInsightsPrompt.parameters.max_tokens,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "Retorne apenas JSON válido." },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      return {
+        insights: fallbackExecutiveInsights(input.kpis),
+        errors: [`executive_insights_error: ${detail}`],
+      };
+    }
+
+    const body = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = body.choices?.[0]?.message?.content;
+    if (!content) {
+      return {
+        insights: fallbackExecutiveInsights(input.kpis),
+        errors: ["executive_insights_empty_response"],
+      };
+    }
+
+    const parsed = JSON.parse(content) as unknown;
+    return {
+      insights: coerceExecutiveInsights(parsed),
+      errors: [],
+    };
+  } catch (error) {
+    return {
+      insights: fallbackExecutiveInsights(input.kpis),
+      errors: [
+        error instanceof Error
+          ? `executive_insights_exception: ${error.message}`
+          : "executive_insights_exception",
       ],
     };
   }
