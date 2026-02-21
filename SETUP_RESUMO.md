@@ -13,9 +13,15 @@
 - Tenant ID: `[SEE .env.local - GIT-IGNORED]`
 - Client Secret: `[SEE .env.local - GIT-IGNORED - válido até 2028]`
 
-✅ **Redirect URIs configurados:**
-- Local: `http://localhost:3000/api/auth/callback/azure-ad`
-- Produção: `https://concilia-brasil.azurewebsites.net/api/auth/callback/azure-ad`
+✅ **Azure OpenAI configurado:**
+- Endpoint: `concilia-brasil-openai.services.ai.azure.com`
+- Deployment: `concilia-brasil-openai`
+- Pronto para document classification
+
+✅ **Azure Document Intelligence (OCR) configurado:**
+- Recurso: `concilia-brasil-docIA`
+- Endpoint: `concilia-brasil-docia.cognitiveservices.azure.com`
+- Pronto para document scanning e OCR
 
 ✅ **API Permissions adicionadas:**
 - User.Read (Microsoft Graph)
@@ -151,7 +157,38 @@ AZURE_AD_TENANT_ID=[CONFIGURED]
 
 ---
 
-## 🔍 TROUBLESHOOTING
+## 🏗️ ARQUITETURA AZURE IMPLEMENTADA
+
+### Serviços Configurados:
+
+| Serviço | Recurso | Status | Função |
+|---------|---------|--------|--------|
+| **Microsoft Entra ID** | App Registration | ✅ Pronto | Autenticação SSO |
+| **Azure OpenAI** | concilia-brasil-openai | ✅ Pronto | Classificação e análise IA |
+| **Document Intelligence** | concilia-brasil-docIA | ✅ Pronto | OCR e extração de dados |
+| **Azure App Service** | concilia-brasil | ✅ Pronto | Hospedagem Next.js |
+| **Azure PostgreSQL** | [seu-servidor] | ✅ Existente | Banco de dados |
+
+### Fluxo de Processamento de Documentos:
+
+```
+1. Upload de arquivo (PDF/Imagem)
+   ↓
+2. Azure Document Intelligence (OCR)
+   → Extrai texto e tabelas do documento
+   ↓
+3. Azure OpenAI (Classificação)
+   → Classifica tipo de documento (Nota, Boleto, etc)
+   → Extrai dados estruturados (cliente, valor, data, etc)
+   ↓
+4. Banco de dados (PostgreSQL)
+   → Armazena documento + dados extraídos
+   ↓
+5. Dashboard/API
+   → Apresenta dados para o usuário
+```
+
+---
 
 ### Erro: "redirect_uri_mismatch"
 - **Causa:** Redirect URI não corresponde
@@ -225,7 +262,14 @@ Marque conforme for completando:
 **Ações Manuais no Portal:**
 - [ ] Admin Consent concedido no Portal Azure
 - [ ] Usuário `ateraoka@yahoo.com` atribuído ao Enterprise App
-- [ ] ✅ Recurso OpenAI criado (URL, API Key colher aqui)
+- [ ] ✅ Recurso OpenAI criado (concilia-brasil-openai)
+- [ ] ✅ Recurso Document Intelligence criado (concilia-brasil-docIA)
+
+**Serviços Azure Configurados:**
+- [ ] ✅ Microsoft Entra ID (Azure AD) - App Registration
+- [ ] ✅ Azure OpenAI - AI classification and processing
+- [ ] ✅ Azure Document Intelligence - OCR and document analysis
+- [ ] Faltam: Azure Blob Storage (opcional), Azure Service Bus (opcional)
 
 **Testes:**
 - [ ] Teste local funcionando (npm run dev)
@@ -233,6 +277,8 @@ Marque conforme for completando:
 - [ ] Usuário ADMIN criado no banco
 - [ ] Deploy produção concluído
 - [ ] Login Microsoft produção OK
+- [ ] OCR funcionando em documentos
+- [ ] Classificação IA funcionando
 
 ---
 
