@@ -55,6 +55,10 @@ jobs:
         continue-on-error: true
         run: npm run test --if-present
 
+      # CRITICAL: Dar permissão de execução ao startup.sh
+      - name: Make startup.sh executable
+        run: chmod +x startup.sh
+
       # Upload TODOS os arquivos necessários para o deploy
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
@@ -66,7 +70,7 @@ jobs:
           path: |
             .next
             node_modules
-            .github
+            .prisma
             app
             lib
             src
@@ -79,7 +83,6 @@ jobs:
             package.json
             package-lock.json
             startup.sh
-            web.config
 
   deploy:
     runs-on: ubuntu-latest
@@ -94,11 +97,18 @@ jobs:
         with:
           name: node-app
       
+      # CRITICAL: Zipar tudo para deploy atômico
+      - name: Prepare deployment package
+        run: |
+          echo "Creating deployment package..."
+          zip -r deploy.zip . -x "*.git*" "*.github*"
+          ls -lh deploy.zip
+      
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'concilia-brasil'
           slot-name: 'Production'
-          package: .
+          package: deploy.zip
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_DDC94CC1DE2548FBB35587CAFBC5690A }}
