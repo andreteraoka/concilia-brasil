@@ -45,6 +45,7 @@ model Document {
   companyId     String
   company       Company  @relation(fields: [companyId], references: [id])
   transactions  Transaction[]
+  processingJobs ProcessingJob[]
   createdAt     DateTime @default(now())
 }
 
@@ -56,6 +57,44 @@ model ProcessingLog {
   message     String
   documentId  String?
   createdAt   DateTime @default(now())
+}
+
+model ProcessingJob {
+  id            String   @id @default(uuid())
+  documentId    String
+  document      Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  status        String   @default("queued") // queued | processing | completed | failed
+  blobPath      String   // caminho ou URI do blob no Azure
+  fileName      String
+  fileSize      Int      // em bytes
+  
+  currentStage  String?  // stage atual do processamento: "ocr" | "classification" | "validation" | "complete"
+  progress      Int      @default(0) // 0-100%
+  
+  // Resultados do processamento
+  ocrText       String?  // texto extraído do OCR
+  extractedData Json?    // dados estruturados extraídos
+  classifications Json?  // classificações do OpenAI
+  
+  // Rastreamento de erro
+  errorMessage  String?
+  errorType     String?  // "ocr_failed" | "classification_failed" | "validation_failed" | "timeout"
+  
+  // Metadados de timing
+  startedAt     DateTime?
+  completedAt   DateTime?
+  estimatedCompletionAt DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([documentId])
+  @@index([companyId])
+  @@index([status])
+  @@index([currentStage])
 }
 
 

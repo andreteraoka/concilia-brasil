@@ -8,6 +8,7 @@
     "start": "node ./node_modules/next/dist/bin/next start",
     "admin:bootstrap": "tsx scripts/manage-admin.ts",
     "admin:rotate": "tsx scripts/rotate-admin-password.ts",
+    "queue:worker": "tsx scripts/document-queue-worker.ts",
     "ingest": "tsx scripts/ingest.ts",
     "lint": "eslint",
     "test": "vitest run",
