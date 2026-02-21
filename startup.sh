@@ -10,20 +10,17 @@ echo "Node: $(node --version)"
 echo "npm: $(npm --version)"
 echo "Working directory: $(pwd)"
 
-# CRITICAL: Verificar se node_modules existe
-if [ ! -d "node_modules" ] || [ ! "$(ls -A node_modules)" ]; then
-  echo "⚠️  node_modules vazio ou ausente!"
-  
-  # Verificar se existe tar.gz para extrair
-  if [ -f "node_modules.tar.gz" ]; then
-    echo "⏳ Extraindo node_modules.tar.gz..."
-    tar -xzf node_modules.tar.gz
-    echo "✅ node_modules extraído"
-  else
-    echo "❌ ERRO: node_modules.tar.gz não encontrado!"
-    echo "Tentando npm ci como fallback..."
-    npm ci --production --prefer-offline
-  fi
+# CRITICAL: Instalar dependências se node_modules estiver vazio/incompleto
+NODE_MODULES_SIZE=$(du -sm node_modules 2>/dev/null | cut -f1 || echo "0")
+echo "node_modules atual: ${NODE_MODULES_SIZE}MB"
+
+if [ "$NODE_MODULES_SIZE" -lt 500 ]; then
+  echo "⚠️  node_modules incompleto (${NODE_MODULES_SIZE}MB < 500MB esperado)"
+  echo "⏳ Instalando dependências com npm ci..."
+  npm ci --prefer-offline --no-audit
+  echo "✅ Dependências instaladas"
+else
+  echo "✅ node_modules OK (${NODE_MODULES_SIZE}MB)"
 fi
 
 # Verificar DATABASE_URL
@@ -46,7 +43,7 @@ fi
 
 # Verificar Prisma Client
 if [ ! -d "node_modules/.prisma" ]; then
-  echo "⏳ Gerando Prisma Client (fallback)..."
+  echo "⏳ Gerando Prisma Client..."
   npx prisma generate
   echo "✅ Prisma Client gerado"
 else
