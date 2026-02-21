@@ -59,30 +59,36 @@ jobs:
       - name: Make startup.sh executable
         run: chmod +x startup.sh
 
-      # Upload TODOS os arquivos necessários para o deploy
+      # CRITICAL: Criar pacote completo para deploy
+      - name: Create deployment package
+        run: |
+          echo "Creating deployment tarball..."
+          tar -czf deploy-package.tar.gz \
+            .next \
+            node_modules \
+            app \
+            lib \
+            src \
+            prisma \
+            public \
+            scripts \
+            middleware.ts \
+            next.config.ts \
+            tsconfig.json \
+            package.json \
+            package-lock.json \
+            startup.sh
+          ls -lh deploy-package.tar.gz
+          echo "Package created successfully"
+
+      # Upload pacote de deploy
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
-          path: |
-            .next
-            node_modules
-            .prisma
-            app
-            lib
-            src
-            prisma
-            public
-            scripts
-            middleware.ts
-            next.config.ts
-            tsconfig.json
-            package.json
-            package-lock.json
-            startup.sh
+          path: deploy-package.tar.gz
 
   deploy:
     runs-on: ubuntu-latest
@@ -97,11 +103,20 @@ jobs:
         with:
           name: node-app
       
+      # Extrair o tarball do build
+      - name: Extract deployment package
+        run: |
+          echo "Extracting deploy-package.tar.gz..."
+          tar -xzf deploy-package.tar.gz
+          rm deploy-package.tar.gz
+          ls -la
+          echo "Extraction complete"
+      
       # CRITICAL: Zipar tudo para deploy atômico
       - name: Prepare deployment package
         run: |
-          echo "Creating deployment package..."
-          zip -r deploy.zip . -x "*.git*" "*.github*"
+          echo "Creating deployment ZIP..."
+          zip -r deploy.zip . -x "*.git*"
           ls -lh deploy.zip
       
       - name: 'Deploy to Azure Web App'
