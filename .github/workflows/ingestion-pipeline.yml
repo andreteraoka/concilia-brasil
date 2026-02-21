@@ -25,23 +25,40 @@ jobs:
           node-version: '22.x'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      # Otimização: Cache de node_modules
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: cache-deps
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-22-ingest-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-22-ingest-
 
-      - name: Lint (if available)
+      # Otimização: Só instala se cache falhou
+      - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit
+
+      # Otimização: Lint e tests em paralelo com ingestão
+      - name: Lint (non-blocking)
         continue-on-error: true
         run: npm run lint --if-present
 
-      - name: Tests (if available)
+      - name: Tests (non-blocking)
         continue-on-error: true
         run: npm run test --if-present
 
+      # Otimização: Ingestão com limite reduzido para CI
       - name: Run ingestion sample
-        run: npm run ingest -- --input ./input --output ./output --max-files 5 --upload false
+        run: npm run ingest -- --input ./input --output ./output --max-files 5 --upload false --quiet
 
+      # Otimização: Upload condicional (só se houver arquivos)
       - name: Upload output artifact
+        if: hashFiles('output/**') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: ingestion-output
+          name: ingestion-output-${{ github.sha }}
           if-no-files-found: warn
+          retention-days: 7
           path: output/**
