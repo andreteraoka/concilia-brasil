@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import { useAuth } from "@/src/modules/auth/frontend";
+import { signIn } from "next-auth/react";
 
 export default function Home() {
   const router = useRouter();
@@ -99,6 +100,29 @@ export default function Home() {
                 className="w-full rounded-md border border-amber-600 bg-amber-500 px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? "Entrando..." : "Entrar"}
+              </button>
+
+              <div className="relative my-3">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-amber-900/50"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-stone-950/70 px-2 text-amber-100/60">OU</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => signIn("azure-ad", { callbackUrl: "/dashboard" })}
+                className="flex w-full items-center justify-center gap-3 rounded-md border border-amber-800/60 bg-white px-4 py-2 text-sm font-medium text-stone-900 transition hover:bg-amber-50"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 21 21" fill="none">
+                  <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                  <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                  <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                  <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+                </svg>
+                Entrar com Microsoft
               </button>
             </form>
 

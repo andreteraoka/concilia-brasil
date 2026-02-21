@@ -15,11 +15,14 @@
     "prisma:migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
+    "@auth/core": "^0.34.3",
+    "@azure/msal-node": "^5.0.4",
     "@azure/storage-blob": "^12.29.1",
     "@prisma/client": "^6.8.2",
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
     "next": "16.1.6",
+    "next-auth": "^4.24.13",
     "openai": "^4.104.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",

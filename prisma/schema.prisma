@@ -26,10 +26,15 @@ model User {
   password    String
   role        String
   status      String   @default("active") // active | inactive
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id])
+  microsoftId String?  @unique // Azure AD user ID for Microsoft Auth
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  @@index([email])
+  @@index([microsoftId])
+  @@index([companyId])
 }
 
 model Document {
