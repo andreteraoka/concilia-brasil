@@ -8,15 +8,16 @@ datasource db {
 }
 
 model Company {
-  id          String   @id @default(uuid())
-  name        String
-  cnpj        String
-  status      String   @default("active")
-  createdAt   DateTime @default(now())
-  users       User[]
-  documents   Document[]
-  accounts    Account[]
-  transactions Transaction[]
+  id              String   @id @default(uuid())
+  name            String
+  cnpj            String
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  users           User[]
+  documents       Document[]
+  accounts        Account[]
+  transactions    Transaction[]
+  processingJobs  ProcessingJob[]
 }
 
 model User {

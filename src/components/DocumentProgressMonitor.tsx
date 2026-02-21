@@ -1,6 +1,6 @@
 'use client';
 
-import { useDocumentProgress } from '@/hooks/useDocumentProgress';
+import { useDocumentProgress } from '@/src/hooks/useDocumentProgress';
 import { useState } from 'react';
 
 const PROCESSING_STAGES = [

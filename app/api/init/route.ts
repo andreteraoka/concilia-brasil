@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { startJobQueue } from '@/lib/queue/documentJobQueue';
+import { startJobQueue } from '@/src/lib/queue/documentJobQueue';
 
 // Esta rota inicializa a job queue quando acessada
 // Deve ser chamada na inicialização da aplicação

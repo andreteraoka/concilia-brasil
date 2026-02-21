@@ -1,6 +1,6 @@
 'use client';
 
-import { DocumentUploadPanel } from '@/components/DocumentUploadPanel';
+import { DocumentUploadPanel } from '@/src/components/DocumentUploadPanel';
 
 export default function DocumentsPage() {
   return (

@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { requireRole } from '@/src/lib/requireRole';
 import { prisma } from '@/lib/prisma';
-import { uploadToBlob } from '@/modules/documents/pipeline/blob';
-import { getJobQueue } from '@/lib/queue/documentJobQueue';
+import { uploadToBlob } from '@/src/modules/documents/pipeline/blob';
+import { getJobQueue } from '@/src/lib/queue/documentJobQueue';
 import { logger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession();
+    const auth = await requireRole(['ADMIN', 'USER']);
+    if (!auth.ok) return auth.response;
+    const { companyId, userId } = auth.context;
 
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Obter user com company
+    // Get user email for logging
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { company: true },
+      where: { id: userId },
     });
 
-    if (!user || !user.company) {
-      return NextResponse.json({ error: 'Company not found' }, { status: 400 });
+    if (!user?.email) {
+      return NextResponse.json({ error: 'User not found' }, { status: 401 });
     }
 
     // Parsear FormData
@@ -53,7 +50,7 @@ export async function POST(req: NextRequest) {
 
         // STAGE 1: Upload para Blob Storage (rápido, síncrono)
         logger.info(`Starting blob upload for file: ${file.name}`);
-        const blobResult = await uploadToBlob(fileBuffer, file.name, user.company.id);
+        const blobResult = await uploadToBlob(fileBuffer, file.name, companyId);
 
         // STAGE 2: Criar Document no banco
         const document = await prisma.document.create({
@@ -61,7 +58,7 @@ export async function POST(req: NextRequest) {
             fileName: file.name,
             fileType: file.type,
             status: 'uploaded',
-            companyId: user.company.id,
+            companyId,
           },
         });
 
@@ -71,7 +68,7 @@ export async function POST(req: NextRequest) {
         const queue = await getJobQueue();
         const jobId = await queue.enqueueDocument(
           document.id,
-          user.company.id,
+          companyId,
           blobResult.blobPath,
           file.name,
           fileBuffer.length

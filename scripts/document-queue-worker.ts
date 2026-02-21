@@ -8,7 +8,7 @@
  * Uso: tsx scripts/document-queue-worker.ts
  */
 
-import { startJobQueue, stopJobQueue } from '@/lib/queue/documentJobQueue';
+import { startJobQueue, stopJobQueue } from '@/src/lib/queue/documentJobQueue';
 import { prisma } from '@/lib/prisma';
 
 async function main() {

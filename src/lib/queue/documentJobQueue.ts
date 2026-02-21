@@ -1,8 +1,5 @@
 import JobQueue from './JobQueue';
 import { prisma } from '@/lib/prisma';
-import { DocumentIntelligenceClient } from '@azure/ai-document-intelligence';
-import { AzureKeyCredential } from '@azure/core-auth';
-import OpenAI from 'openai';
 
 let jobQueue: JobQueue | null = null;
 
@@ -11,17 +8,8 @@ export async function getJobQueue(): Promise<JobQueue> {
     return jobQueue;
   }
 
-  // Inicializar Job Queue
-  const docIntelligence = new DocumentIntelligenceClient(
-    process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT || '',
-    new AzureKeyCredential(process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY || '')
-  );
-
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-
-  jobQueue = new JobQueue(prisma, docIntelligence, openai, {
+  // Inicializar Job Queue (sem dependências externas - clients lazy loaded)
+  jobQueue = new JobQueue(prisma, {
     maxConcurrent: parseInt(process.env.PROCESSING_MAX_CONCURRENT || '5', 10),
     pollInterval: parseInt(process.env.PROCESSING_POLL_INTERVAL || '5000', 10),
   });

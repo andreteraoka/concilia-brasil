@@ -1,37 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { requireRole } from '@/src/lib/requireRole';
 import { prisma } from '@/lib/prisma';
-import { getJobQueue } from '@/lib/queue/documentJobQueue';
+import { getJobQueue } from '@/src/lib/queue/documentJobQueue';
 import { logger } from '@/lib/logger';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { documentId: string } }
+  { params }: { params: Promise<{ documentId: string }> }
 ) {
   try {
-    const session = await getSession();
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { documentId } = params;
-
-    // Verificar se documento pertence à empresa do usuário
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { company: true },
-    });
-
-    if (!user || !user.company) {
-      return NextResponse.json({ error: 'Company not found' }, { status: 400 });
-    }
+    const { documentId } = await params;
+    const auth = await requireRole(['ADMIN', 'USER']);
+    if (!auth.ok) return auth.response;
+    const { companyId } = auth.context;
 
     const document = await prisma.document.findUnique({
       where: { id: documentId },
     });
 
-    if (!document || document.companyId !== user.company.id) {
+    if (!document || document.companyId !== companyId) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
 

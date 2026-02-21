@@ -1,31 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { requireRole } from '@/src/lib/requireRole';
 import { prisma } from '@/lib/prisma';
-import { getJobQueue } from '@/lib/queue/documentJobQueue';
+import { getJobQueue } from '@/src/lib/queue/documentJobQueue';
 import { logger } from '@/lib/logger';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const session = await getSession();
-
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { jobId } = params;
-
-    // Verificar autorização (job pertence à empresa do usuário)
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { company: true },
-    });
-
-    if (!user || !user.company) {
-      return NextResponse.json({ error: 'Company not found' }, { status: 400 });
-    }
+    const { jobId } = await params;
+    const auth = await requireRole(['ADMIN', 'USER']);
+    if (!auth.ok) return auth.response;
+    const { companyId } = auth.context;
 
     const job = await prisma.processingJob.findUnique({
       where: { id: jobId },
@@ -34,7 +21,7 @@ export async function GET(
       },
     });
 
-    if (!job || job.companyId !== user.company.id) {
+    if (!job || job.companyId !== companyId) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 

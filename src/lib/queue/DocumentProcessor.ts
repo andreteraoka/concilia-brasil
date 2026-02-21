@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { DocumentIntelligenceClient } from '@azure/ai-document-intelligence';
-import OpenAI from 'openai';
+
 
 type ProcessingStage = 'ocr' | 'classification' | 'validation' | 'complete';
 
@@ -12,17 +11,9 @@ interface ProcessingProgress {
 
 class DocumentProcessor {
   private prisma: PrismaClient;
-  private docIntelligence: DocumentIntelligenceClient;
-  private openai: OpenAI;
 
-  constructor(
-    prisma: PrismaClient,
-    docIntelligence: DocumentIntelligenceClient,
-    openai: OpenAI
-  ) {
+  constructor(prisma: PrismaClient) {
     this.prisma = prisma;
-    this.docIntelligence = docIntelligence;
-    this.openai = openai;
   }
 
   private async updateJobProgress(

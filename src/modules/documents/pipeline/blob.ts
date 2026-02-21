@@ -1,6 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import { BlobServiceClient } from "@azure/storage-blob";
+import { createHash } from "crypto";
 
 function hasBlobConfig() {
   return Boolean(
@@ -63,5 +64,58 @@ export async function uploadArtifacts(options: {
       blobOriginalUrl: null,
       errors: [error instanceof Error ? `azure_blob_upload_error: ${error.message}` : "azure_blob_upload_error"],
     };
+  }
+}
+
+export async function uploadToBlob(
+  fileBuffer: Buffer,
+  fileName: string,
+  companyId: string
+): Promise<{ blobPath: string; blobUrl: string }> {
+  if (!hasBlobConfig()) {
+    throw new Error("Azure Blob Storage not configured");
+  }
+
+  const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING!;
+  const containerName = process.env.AZURE_STORAGE_CONTAINER!;
+
+  try {
+    // Gerar hash SHA256 do arquivo para naming único
+    const fileHash = createHash("sha256").update(fileBuffer).digest("hex");
+    const blobName = `documents/${companyId}/${fileHash}/${fileName}`;
+
+    const client = BlobServiceClient.fromConnectionString(connectionString);
+    const container = client.getContainerClient(containerName);
+    await container.createIfNotExists();
+
+    const blobClient = container.getBlockBlobClient(blobName);
+
+    // Detectar MIME type baseado na extensão
+    const ext = path.extname(fileName).toLowerCase();
+    const mimeTypes: { [key: string]: string } = {
+      ".pdf": "application/pdf",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".tiff": "image/tiff",
+      ".doc": "application/msword",
+      ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    };
+
+    const contentType = mimeTypes[ext] || "application/octet-stream";
+
+    // Upload com headers apropriados
+    await blobClient.uploadData(fileBuffer, {
+      blobHTTPHeaders: { blobContentType: contentType },
+    });
+
+    return {
+      blobPath: blobName,
+      blobUrl: blobClient.url,
+    };
+  } catch (error) {
+    throw new Error(
+      `Blob upload failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
   }
 }
