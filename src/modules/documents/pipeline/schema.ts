@@ -84,6 +84,37 @@ export const outputSchema = z.object({
     route: z.string().min(1),
     security_flags: z.array(z.enum(["PII_DETECTED", "SUSPECTED_CREDENTIALS", "NONE"])),
   }),
+  persistencePayload: z.object({
+    companyId: z.string().min(1),
+    accounts: z.array(
+      z.object({
+        externalRef: z.string().min(1),
+        bankName: z.string().optional(),
+        last4: z.string().optional(),
+        currency: z.string().min(1),
+      })
+    ),
+    transactions: z.array(
+      z.object({
+        accountRef: z.string().min(1),
+        date: z.string().min(1),
+        description: z.string().min(1),
+        amount: z.number(),
+        type: z.enum(["CREDIT", "DEBIT"]),
+        category: z.string().optional(),
+        sourceDocId: z.string().optional(),
+      })
+    ),
+    document: z.object({
+      source: z.string(),
+      originalFilename: z.string(),
+      period_start: z.string().optional(),
+      period_end: z.string().optional(),
+      closing_balance: z.number().optional(),
+      issues: z.array(z.string()).optional(),
+      accuracyScore: z.number().optional(),
+    }),
+  }),
   azure: z.object({
     blobJsonUrl: z.string().nullable(),
     blobOriginalUrl: z.string().nullable(),

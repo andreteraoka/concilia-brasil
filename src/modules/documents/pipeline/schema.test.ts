@@ -59,6 +59,37 @@ describe("pipeline schema", () => {
         route: "extract_other",
         security_flags: ["NONE"],
       },
+      persistencePayload: {
+        companyId: "company-1",
+        accounts: [
+          {
+            externalRef: "itau_1234",
+            bankName: "Itau",
+            last4: "1234",
+            currency: "BRL",
+          },
+        ],
+        transactions: [
+          {
+            accountRef: "itau_1234",
+            date: "2026-02-20",
+            description: "Teste",
+            amount: -10,
+            type: "DEBIT",
+            category: "OUTROS",
+            sourceDocId: "doc-1",
+          },
+        ],
+        document: {
+          source: "",
+          originalFilename: "file.txt",
+          period_start: "2026-02-01",
+          period_end: "2026-02-20",
+          closing_balance: 100,
+          issues: [],
+          accuracyScore: 0.6,
+        },
+      },
       azure: {
         blobJsonUrl: null,
         blobOriginalUrl: null,

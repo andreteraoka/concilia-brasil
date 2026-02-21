@@ -1,6 +1,11 @@
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
-import { analyzeWithAI, classifyDocumentRoute, validateSemanticPostOcr } from "./ai";
+import {
+  analyzeWithAI,
+  buildStructuredPayload,
+  classifyDocumentRoute,
+  validateSemanticPostOcr,
+} from "./ai";
 import { uploadArtifacts } from "./blob";
 import { extractDocument } from "./extractor";
 import { validateOutput } from "./schema";
@@ -104,6 +109,15 @@ function createBaseOutput(input: {
       route: "extract_other",
       security_flags: ["NONE"],
     },
+    persistencePayload: {
+      companyId: "unknown-company",
+      accounts: [],
+      transactions: [],
+      document: {
+        source: "",
+        originalFilename: input.fileName,
+      },
+    },
     azure: {
       blobJsonUrl: null,
       blobOriginalUrl: null,
@@ -181,6 +195,23 @@ async function processFile(filePath: string, options: IngestOptions) {
   if (route.routeClassification.doc_type === "REJECT" || route.routeClassification.route === "skip") {
     baseOutput.errors.push("route_skip_requested");
   }
+
+  const structured = await buildStructuredPayload({
+    validatedDoc: semantic.semanticValidation,
+    tenantContext: {
+      companyId: process.env.INGEST_DEFAULT_COMPANY_ID || "unknown-company",
+      timezone: process.env.INGEST_DEFAULT_TIMEZONE || "America/Sao_Paulo",
+      currency_default: process.env.INGEST_DEFAULT_CURRENCY || "BRL",
+    },
+    fileMeta: {
+      originalFilename: fileName,
+      sourceUri: baseOutput.azure.blobOriginalUrl || "",
+      sourceDocId: sha256,
+    },
+  });
+
+  baseOutput.persistencePayload = structured.persistencePayload;
+  baseOutput.errors.push(...structured.errors);
 
   const outputFilePath = path.resolve(options.output, `${sha256}_${safeName}.json`);
   baseOutput.timestamps.processedAt = nowIso();

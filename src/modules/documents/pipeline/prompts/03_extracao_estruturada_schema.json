@@ -1,0 +1,74 @@
+{
+  "name": "03_extracao_estruturada_schema",
+  "description": "Converte um documento validado em payload pronto para persistência nas tabelas (multi-tenant).",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "validated_doc": { "type": "object" },
+      "tenant_context": {
+        "type": "object",
+        "properties": {
+          "companyId": { "type": "string" },
+          "timezone": { "type": "string" },
+          "currency_default": { "type": "string" }
+        },
+        "required": ["companyId"]
+      }
+    },
+    "required": ["validated_doc", "tenant_context"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "companyId": { "type": "string" },
+      "accounts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "externalRef": { "type": "string" },
+            "bankName": { "type": "string" },
+            "last4": { "type": "string" },
+            "currency": { "type": "string" }
+          },
+          "required": ["externalRef", "currency"]
+        }
+      },
+      "transactions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "accountRef": { "type": "string" },
+            "date": { "type": "string" },
+            "description": { "type": "string" },
+            "amount": { "type": "number" },
+            "type": { "type": "string", "enum": ["CREDIT", "DEBIT"] },
+            "category": { "type": "string" },
+            "sourceDocId": { "type": "string" }
+          },
+          "required": ["accountRef", "date", "description", "amount", "type"]
+        }
+      },
+      "document": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string" },
+          "originalFilename": { "type": "string" },
+          "period_start": { "type": "string" },
+          "period_end": { "type": "string" },
+          "closing_balance": { "type": "number" },
+          "issues": { "type": "array", "items": { "type": "string" } },
+          "accuracyScore": { "type": "number" }
+        }
+      }
+    },
+    "required": ["companyId", "accounts", "transactions", "document"]
+  },
+  "prompt_template": "Converta o documento validado (validated_doc) em um payload pronto para persistência (PostgreSQL/Prisma),\nrespeitando multi-tenant (companyId) e as regras:\n\nRegras:\n- \"accounts[].externalRef\" pode ser composto por bank_name + last4.\n- \"transactions[].accountRef\" deve referenciar um accounts[].externalRef existente.\n- \"amount\": positivo para crédito e negativo para débito.\n- \"category\": normalize para um conjunto curto (ex.: RECEITAS, DESPESAS, TARIFAS, IMPOSTOS, TRANSFERENCIAS, OUTROS).\n- \"document.source\": use a URI do Blob se disponível; se ausente, deixe vazio e NÃO invente.\n\nEntrada:\n- validated_doc: {{validated_doc}}\n- tenant_context: {{tenant_context}}\n\nSaída: Um único JSON no schema especificado. Sem comentários ou texto adicional.",
+  "parameters": {
+    "temperature": 0.1,
+    "top_p": 0.1,
+    "max_tokens": 1200
+  }
+}

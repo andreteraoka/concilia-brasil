@@ -1,5 +1,6 @@
 import semanticValidationPrompt from "./prompts/01_validacao_semantica_pos_ocr.json";
 import routeClassificationPrompt from "./prompts/02_classificacao_documento.json";
+import structuredSchemaPrompt from "./prompts/03_extracao_estruturada_schema.json";
 import {
   DOCUMENT_TYPES,
   ClassificationOutput,
@@ -9,6 +10,7 @@ import {
   RouteClassificationOutput,
   RouteDocType,
   RouteSecurityFlag,
+  StructuredPayloadOutput,
 } from "./types";
 
 const EMPTY_FIELDS: FieldsOutput = {
@@ -674,6 +676,235 @@ export async function classifyDocumentRoute(input: {
         error instanceof Error
           ? `route_classification_exception: ${error.message}`
           : "route_classification_exception",
+      ],
+    };
+  }
+}
+
+function normalizeCategory(value: string | undefined): string {
+  const v = (value || "").toUpperCase();
+  if (v.includes("RECEITA")) return "RECEITAS";
+  if (v.includes("DESPESA")) return "DESPESAS";
+  if (v.includes("TARIFA")) return "TARIFAS";
+  if (v.includes("IMPOST")) return "IMPOSTOS";
+  if (v.includes("TRANSFER")) return "TRANSFERENCIAS";
+  return "OUTROS";
+}
+
+function fallbackStructuredPayload(input: {
+  validatedDoc: SemanticValidationOutput;
+  tenantContext: { companyId: string; timezone?: string; currency_default?: string };
+  fileMeta: { originalFilename: string; sourceUri?: string; sourceDocId: string };
+}): StructuredPayloadOutput {
+  const companyId = input.tenantContext.companyId;
+  const currency = input.validatedDoc.normalized.currency || input.tenantContext.currency_default || "BRL";
+  const bankName = input.validatedDoc.normalized.bank_name || "";
+  const last4 = input.validatedDoc.normalized.account_last4 || "";
+  const externalRef = `${bankName || "bank"}_${last4 || "0000"}`;
+
+  const transactions = input.validatedDoc.normalized.transactions.map((tx) => ({
+    accountRef: externalRef,
+    date: tx.date,
+    description: tx.description,
+    amount: tx.type === "DEBIT" ? -Math.abs(tx.amount) : Math.abs(tx.amount),
+    type: tx.type,
+    category: normalizeCategory(tx.category_guess || undefined),
+    sourceDocId: input.fileMeta.sourceDocId,
+  }));
+
+  return {
+    companyId,
+    accounts: [
+      {
+        externalRef,
+        bankName: bankName || undefined,
+        last4: last4 || undefined,
+        currency,
+      },
+    ],
+    transactions,
+    document: {
+      source: input.fileMeta.sourceUri || "",
+      originalFilename: input.fileMeta.originalFilename,
+      period_start: input.validatedDoc.normalized.period_start,
+      period_end: input.validatedDoc.normalized.period_end,
+      closing_balance: input.validatedDoc.normalized.closing_balance,
+      issues: input.validatedDoc.issues.map((issue) => issue.code),
+      accuracyScore: input.validatedDoc.confidence_overall,
+    },
+  };
+}
+
+function coerceStructuredPayload(
+  value: unknown,
+  fallback: StructuredPayloadOutput
+): StructuredPayloadOutput {
+  if (!value || typeof value !== "object") {
+    return fallback;
+  }
+
+  const payload = value as {
+    companyId?: unknown;
+    accounts?: unknown;
+    transactions?: unknown;
+    document?: unknown;
+  };
+
+  const accounts = Array.isArray(payload.accounts)
+    ? payload.accounts
+        .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+        .map((item) => ({
+          externalRef:
+            typeof item.externalRef === "string" && item.externalRef.trim().length > 0
+              ? item.externalRef
+              : fallback.accounts[0]?.externalRef || "bank_0000",
+          bankName: typeof item.bankName === "string" ? item.bankName : undefined,
+          last4: typeof item.last4 === "string" ? item.last4 : undefined,
+          currency: typeof item.currency === "string" ? item.currency : "BRL",
+        }))
+    : fallback.accounts;
+
+  const accountRefs = new Set(accounts.map((account) => account.externalRef));
+  const defaultRef = accounts[0]?.externalRef || "bank_0000";
+
+  const transactions = Array.isArray(payload.transactions)
+    ? payload.transactions
+        .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+        .map((item) => {
+          const type = (item.type === "CREDIT" ? "CREDIT" : "DEBIT") as "CREDIT" | "DEBIT";
+          const rawAmount = typeof item.amount === "number" ? item.amount : 0;
+          return {
+            accountRef:
+              typeof item.accountRef === "string" && accountRefs.has(item.accountRef)
+                ? item.accountRef
+                : defaultRef,
+            date: typeof item.date === "string" ? item.date : "",
+            description: typeof item.description === "string" ? item.description : "",
+            amount: type === "DEBIT" ? -Math.abs(rawAmount) : Math.abs(rawAmount),
+            type,
+            category:
+              typeof item.category === "string"
+                ? normalizeCategory(item.category)
+                : "OUTROS",
+            sourceDocId:
+              typeof item.sourceDocId === "string"
+                ? item.sourceDocId
+                : fallback.document.originalFilename,
+          };
+        })
+        .filter((tx) => tx.date && tx.description)
+    : fallback.transactions;
+
+  const document =
+    payload.document && typeof payload.document === "object"
+      ? (payload.document as Record<string, unknown>)
+      : {};
+
+  return {
+    companyId:
+      typeof payload.companyId === "string" && payload.companyId.trim().length > 0
+        ? payload.companyId
+        : fallback.companyId,
+    accounts: accounts.length > 0 ? accounts : fallback.accounts,
+    transactions,
+    document: {
+      source: typeof document.source === "string" ? document.source : fallback.document.source,
+      originalFilename:
+        typeof document.originalFilename === "string"
+          ? document.originalFilename
+          : fallback.document.originalFilename,
+      period_start:
+        typeof document.period_start === "string" ? document.period_start : fallback.document.period_start,
+      period_end: typeof document.period_end === "string" ? document.period_end : fallback.document.period_end,
+      closing_balance:
+        typeof document.closing_balance === "number"
+          ? document.closing_balance
+          : fallback.document.closing_balance,
+      issues: Array.isArray(document.issues)
+        ? document.issues.filter((item): item is string => typeof item === "string")
+        : fallback.document.issues,
+      accuracyScore:
+        typeof document.accuracyScore === "number"
+          ? Math.max(0, Math.min(1, document.accuracyScore))
+          : fallback.document.accuracyScore,
+    },
+  };
+}
+
+export async function buildStructuredPayload(input: {
+  validatedDoc: SemanticValidationOutput;
+  tenantContext: { companyId: string; timezone?: string; currency_default?: string };
+  fileMeta: { originalFilename: string; sourceUri?: string; sourceDocId: string };
+}): Promise<{ persistencePayload: StructuredPayloadOutput; errors: string[] }> {
+  const fallback = fallbackStructuredPayload(input);
+
+  if (!hasAzureOpenAIConfig()) {
+    return {
+      persistencePayload: fallback,
+      errors: ["azure_openai_not_configured_structured_payload"],
+    };
+  }
+
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT!.replace(/\/$/, "");
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT!;
+  const apiKey = process.env.AZURE_OPENAI_API_KEY!;
+  const apiVersion = process.env.AZURE_OPENAI_API_VERSION!;
+  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+
+  const prompt = structuredSchemaPrompt.prompt_template
+    .replace("{{validated_doc}}", JSON.stringify(input.validatedDoc, null, 2))
+    .replace("{{tenant_context}}", JSON.stringify(input.tenantContext, null, 2));
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify({
+        temperature: structuredSchemaPrompt.parameters.temperature,
+        top_p: structuredSchemaPrompt.parameters.top_p,
+        max_tokens: structuredSchemaPrompt.parameters.max_tokens,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "Retorne apenas JSON válido." },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      return {
+        persistencePayload: fallback,
+        errors: [`structured_payload_error: ${detail}`],
+      };
+    }
+
+    const body = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = body.choices?.[0]?.message?.content;
+    if (!content) {
+      return {
+        persistencePayload: fallback,
+        errors: ["structured_payload_empty_response"],
+      };
+    }
+
+    const parsed = JSON.parse(content) as unknown;
+    return {
+      persistencePayload: coerceStructuredPayload(parsed, fallback),
+      errors: [],
+    };
+  } catch (error) {
+    return {
+      persistencePayload: fallback,
+      errors: [
+        error instanceof Error
+          ? `structured_payload_exception: ${error.message}`
+          : "structured_payload_exception",
       ],
     };
   }

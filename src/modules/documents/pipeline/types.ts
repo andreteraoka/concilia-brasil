@@ -95,6 +95,40 @@ export type RouteClassificationOutput = {
   security_flags: RouteSecurityFlag[];
 };
 
+export type StructuredAccount = {
+  externalRef: string;
+  bankName?: string;
+  last4?: string;
+  currency: string;
+};
+
+export type StructuredTransaction = {
+  accountRef: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: "CREDIT" | "DEBIT";
+  category?: string;
+  sourceDocId?: string;
+};
+
+export type StructuredDocument = {
+  source: string;
+  originalFilename: string;
+  period_start?: string;
+  period_end?: string;
+  closing_balance?: number;
+  issues?: string[];
+  accuracyScore?: number;
+};
+
+export type StructuredPayloadOutput = {
+  companyId: string;
+  accounts: StructuredAccount[];
+  transactions: StructuredTransaction[];
+  document: StructuredDocument;
+};
+
 export type PipelineOutput = {
   id: string;
   source: {
@@ -113,6 +147,7 @@ export type PipelineOutput = {
   fields: FieldsOutput;
   semanticValidation: SemanticValidationOutput;
   routeClassification: RouteClassificationOutput;
+  persistencePayload: StructuredPayloadOutput;
   azure: {
     blobJsonUrl: string | null;
     blobOriginalUrl: string | null;

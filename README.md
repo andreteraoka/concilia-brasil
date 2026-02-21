@@ -462,6 +462,14 @@ Saída por arquivo:
 - Objetivo: classificar documento, sugerir rota (`route`) e bloquear irrelevantes (`REJECT`/`skip`)
 - Resultado no output: seção `routeClassification`
 
+### Prompt de extração estruturada (pronto para persistência)
+
+- Arquivos:
+  - `src/modules/documents/pipeline/prompts/03_extracao_estruturada_schema.md`
+  - `src/modules/documents/pipeline/prompts/03_extracao_estruturada_schema.json`
+- Objetivo: converter documento validado em payload transacional multi-tenant para PostgreSQL/Prisma
+- Resultado no output: seção `persistencePayload`
+
 ### Workflow GitHub Actions
 
 Arquivo: `.github/workflows/ingestion-pipeline.yml`
