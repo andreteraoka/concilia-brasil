@@ -1,41 +1,47 @@
 #!/bin/bash
-set -e  # Exit on error
+set -e  # Sair em caso de erro
 
-# === STARTUP CONVILHA BRASIL (STANDALONE MODE) ===
-# Script de inicialização otimizado para Azure App Service Linux
-# Logs disponíveis em: /home/LogFiles/startup.log
+# === LOG DE INICIALIZAÇÃO - CONCILIA BRASIL ===
+# O Azure redireciona STDOUT/STDERR para os logs (/home/LogFiles/...)
+echo "===================================================="
+echo "🚀 INICIANDO CONCILIA BRASIL - STANDALONE MODE"
+echo "📅 Data/Hora: $(date)"
+echo "📂 Diretório Atual: $(pwd)"
+echo "🔍 Listagem de Arquivos:"
+ls -F
+echo "===================================================="
 
-echo "⏳ Iniciando ambiente (Standalone Mode)..."
-echo "Timestamp: $(date)"
-
-# CRITICAL: Migrations do Prisma
+# 1. VERIFICAR VARIÁVEIS CRÍTICAS
 if [ -z "$DATABASE_URL" ]; then
-    echo "⚠️  AVISO: DATABASE_URL não encontrada. As migrations serão ignoradas."
+    echo "❌ [ERRO] DATABASE_URL não está configurada no Azure!"
+    # Mas tentaremos subir mesmo assim se for opcional
 else
-    echo "⏳ Rodando Prisma migrations..."
-    # npx prisma migrate deploy --skip-generate
-    # Caso npx esteja lento, podemos usar o binário direto do prisma
-    ./node_modules/.bin/prisma migrate deploy --skip-generate
-    echo "✅ Migrations concluídas."
+    echo "✅ [INFO] DATABASE_URL encontrada."
 fi
 
-# Ajuste de permissões (se necessário)
-chmod -R 755 .
+# 2. RODAR MIGRATIONS (SE POSSÍVEL)
+# No modo standalone, o Prisma binary deve estar no node_modules copiado
+if [ -f "./node_modules/.bin/prisma" ]; then
+    echo "⏳ [MIGRATE] Rodando Prisma Migrate Deploy..."
+    ./node_modules/.bin/prisma migrate deploy --skip-generate || echo "⚠️ [AVISO] Falha ou nada para migrar."
+else
+    echo "⚠️ [AVISO] Binário do Prisma não encontrado; pulando migrations automáticas."
+fi
 
-# CRITICAL: Inicializar Next.js Server
-# No modo standalone, o server.js está na raiz do pacote enviado.
+# 3. CONFIGURAR PORTA (O Azure espera tráfego na porta enviada pelo WEBSITES_PORT)
+export PORT="${PORT:-3000}"
+export HOSTNAME="0.0.0.0"
+
+echo "📡 [SERVER] Escutando em $HOSTNAME na porta $PORT"
+echo "===================================================="
+
+# 4. EXECUTAR SERVER (O server.js foi gerado pelo Next.js Standalone build)
 if [ -f "server.js" ]; then
-    echo "🚀 Servidor detectado. Iniciando node server.js..."
-    
-    # Pró-ativo: Azure espera tráfego na porta 8080 ou detecta a porta.
-    # O Next.js standalone usa a variável PORT ou padrão 3000.
-    export PORT="${PORT:-3000}"
-    echo "Escutando na porta: ${PORT}"
-    
+    echo "🔥 [START] node server.js"
     exec node server.js
 else
-    echo "❌ erro: server.js não encontrado na raiz (/home/site/wwwroot/)."
-    echo "Verificando estrutura de arquivos:"
-    ls -la
+    echo "❌ [ERRO CRÍTICO] server.js NÃO ENCONTRADO na raiz!"
+    echo "Estrutura detectada:"
+    ls -R | head -n 20
     exit 1
 fi

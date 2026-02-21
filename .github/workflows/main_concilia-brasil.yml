@@ -54,16 +54,30 @@ jobs:
       - name: Prepare Standalone Package
         run: |
           mkdir deploy_package
-          # Copiar os arquivos standalone gerados pelo Next.js
-          cp -r .next/standalone/* deploy_package/
-          # Pró-ativo: Mover arquivos de assets que o standalone precisa manualmente
-          cp -r public deploy_package/
-          cp -r .next/static deploy_package/.next/
-          # Copiar o script de inicialização
+          
+          echo "--- COPIANDO STANDALONE ARTIFACTS ---"
+          # 1. Copia o core do standalone (.next/standalone já inclui node_modules podados)
+          cp -rp .next/standalone/. deploy_package/
+          
+          # 2. Copia assets estáticos que o standalone NÃO inclui por padrão
+          mkdir -p deploy_package/.next/static
+          cp -rp .next/static/. deploy_package/.next/static/
+          
+          mkdir -p deploy_package/public
+          cp -rp public/. deploy_package/public/
+          
+          # 3. Copia a pasta prisma para que as migrations e o schema estejam lá se o binário precisar
+          mkdir -p deploy_package/prisma
+          cp -rp prisma/. deploy_package/prisma/
+          
+          # 4. Copia o script de startup customizado
           cp startup.sh deploy_package/
           chmod +x deploy_package/startup.sh
 
-      # Upload pacote de deploy standalone
+          echo "--- CONTEÚDO FINAL DO PACOTE ---"
+          ls -R deploy_package | head -n 50
+
+      # Upload pacote de deploy standalone (limpo e leve)
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
