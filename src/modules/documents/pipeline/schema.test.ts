@@ -52,6 +52,13 @@ describe("pipeline schema", () => {
         issues: [{ code: "MISSING_FIELD" }],
         needs_human_review: true,
       },
+      routeClassification: {
+        doc_type: "OTHER",
+        confidence: 0.3,
+        reasons: ["fallback"],
+        route: "extract_other",
+        security_flags: ["NONE"],
+      },
       azure: {
         blobJsonUrl: null,
         blobOriginalUrl: null,

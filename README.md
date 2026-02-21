@@ -454,6 +454,14 @@ Saída por arquivo:
 - Objetivo: validar consistência financeira após OCR e normalizar transações com confiança
 - Resultado no output: seção `semanticValidation`
 
+### Prompt de classificação + detecção de lixo
+
+- Arquivos:
+  - `src/modules/documents/pipeline/prompts/02_classificacao_documento.md`
+  - `src/modules/documents/pipeline/prompts/02_classificacao_documento.json`
+- Objetivo: classificar documento, sugerir rota (`route`) e bloquear irrelevantes (`REJECT`/`skip`)
+- Resultado no output: seção `routeClassification`
+
 ### Workflow GitHub Actions
 
 Arquivo: `.github/workflows/ingestion-pipeline.yml`

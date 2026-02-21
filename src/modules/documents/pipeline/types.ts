@@ -76,6 +76,25 @@ export type SemanticValidationOutput = {
   needs_human_review: boolean;
 };
 
+export type RouteDocType =
+  | "BANK_STATEMENT"
+  | "INVOICE"
+  | "BOLETO"
+  | "RECEIPT"
+  | "CONTRACT"
+  | "OTHER"
+  | "REJECT";
+
+export type RouteSecurityFlag = "PII_DETECTED" | "SUSPECTED_CREDENTIALS" | "NONE";
+
+export type RouteClassificationOutput = {
+  doc_type: RouteDocType;
+  confidence: number;
+  reasons: string[];
+  route: string;
+  security_flags: RouteSecurityFlag[];
+};
+
 export type PipelineOutput = {
   id: string;
   source: {
@@ -93,6 +112,7 @@ export type PipelineOutput = {
   classification: ClassificationOutput;
   fields: FieldsOutput;
   semanticValidation: SemanticValidationOutput;
+  routeClassification: RouteClassificationOutput;
   azure: {
     blobJsonUrl: string | null;
     blobOriginalUrl: string | null;

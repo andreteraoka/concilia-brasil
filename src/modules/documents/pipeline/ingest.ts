@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
-import { analyzeWithAI, validateSemanticPostOcr } from "./ai";
+import { analyzeWithAI, classifyDocumentRoute, validateSemanticPostOcr } from "./ai";
 import { uploadArtifacts } from "./blob";
 import { extractDocument } from "./extractor";
 import { validateOutput } from "./schema";
@@ -97,6 +97,13 @@ function createBaseOutput(input: {
       issues: [],
       needs_human_review: true,
     },
+    routeClassification: {
+      doc_type: "OTHER",
+      confidence: 0,
+      reasons: [],
+      route: "extract_other",
+      security_flags: ["NONE"],
+    },
     azure: {
       blobJsonUrl: null,
       blobOriginalUrl: null,
@@ -152,6 +159,28 @@ async function processFile(filePath: string, options: IngestOptions) {
 
   baseOutput.semanticValidation = semantic.semanticValidation;
   baseOutput.errors.push(...semantic.errors);
+
+  const route = await classifyDocumentRoute({
+    ocrJson: {
+      method: extraction.method,
+      text: extraction.text,
+      pages: extraction.pages,
+    },
+    fileMeta: {
+      fileName,
+      mimeType,
+      sizeBytes: fileBuffer.length,
+      sha256,
+    },
+    extractionText: extraction.text,
+  });
+
+  baseOutput.routeClassification = route.routeClassification;
+  baseOutput.errors.push(...route.errors);
+
+  if (route.routeClassification.doc_type === "REJECT" || route.routeClassification.route === "skip") {
+    baseOutput.errors.push("route_skip_requested");
+  }
 
   const outputFilePath = path.resolve(options.output, `${sha256}_${safeName}.json`);
   baseOutput.timestamps.processedAt = nowIso();

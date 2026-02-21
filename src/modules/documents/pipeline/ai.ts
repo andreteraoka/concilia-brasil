@@ -1,10 +1,14 @@
 import semanticValidationPrompt from "./prompts/01_validacao_semantica_pos_ocr.json";
+import routeClassificationPrompt from "./prompts/02_classificacao_documento.json";
 import {
   DOCUMENT_TYPES,
   ClassificationOutput,
   DocumentType,
   FieldsOutput,
   SemanticValidationOutput,
+  RouteClassificationOutput,
+  RouteDocType,
+  RouteSecurityFlag,
 } from "./types";
 
 const EMPTY_FIELDS: FieldsOutput = {
@@ -206,6 +210,148 @@ function coerceSemanticValidation(value: unknown): SemanticValidationOutput {
     },
     issues,
     needs_human_review: Boolean(payload.needs_human_review),
+  };
+}
+
+function hasSensitiveSignals(text: string): RouteSecurityFlag[] {
+  const lower = text.toLowerCase();
+  const flags: RouteSecurityFlag[] = [];
+
+  if (/senha|password|private key|chave privada|seed phrase/.test(lower)) {
+    flags.push("SUSPECTED_CREDENTIALS");
+  }
+
+  if (/cpf|cnpj|rg\b|cart[aã]o|n[uú]mero do cart[aã]o/.test(lower)) {
+    flags.push("PII_DETECTED");
+  }
+
+  return flags.length > 0 ? flags : ["NONE"];
+}
+
+function fallbackRouteClassification(input: {
+  text: string;
+  fileName: string;
+}): RouteClassificationOutput {
+  const text = input.text.toLowerCase();
+  const fileName = input.fileName.toLowerCase();
+  const combined = `${fileName} ${text}`;
+
+  const rejectSignals = ["capa", "cover", "publicidade", "anúncio", "lorem ipsum"];
+  const isBlankLike = combined.trim().length < 20;
+  if (isBlankLike || rejectSignals.some((signal) => combined.includes(signal))) {
+    return {
+      doc_type: "REJECT",
+      confidence: 0.9,
+      reasons: ["Documento irrelevante ou sem conteúdo financeiro útil"],
+      route: "skip",
+      security_flags: hasSensitiveSignals(combined),
+    };
+  }
+
+  const candidates: Array<{ type: RouteDocType; route: string; terms: string[]; confidence: number }> = [
+    {
+      type: "BANK_STATEMENT",
+      route: "extract_bank_statement",
+      terms: ["extrato", "saldo", "lançamento", "saldo anterior", "saldo final"],
+      confidence: 0.72,
+    },
+    {
+      type: "BOLETO",
+      route: "extract_boleto",
+      terms: ["linha digitável", "boleto", "vencimento"],
+      confidence: 0.72,
+    },
+    {
+      type: "INVOICE",
+      route: "extract_invoice",
+      terms: ["nota fiscal", "nfe", "danfe", "fatura"],
+      confidence: 0.68,
+    },
+    {
+      type: "RECEIPT",
+      route: "extract_receipt",
+      terms: ["recibo", "comprovante"],
+      confidence: 0.66,
+    },
+    {
+      type: "CONTRACT",
+      route: "extract_contract",
+      terms: ["contrato", "cláusula", "assinatura"],
+      confidence: 0.64,
+    },
+  ];
+
+  const found = candidates.find((item) => item.terms.some((term) => combined.includes(term)));
+
+  if (!found) {
+    return {
+      doc_type: "OTHER",
+      confidence: 0.4,
+      reasons: ["Sem evidência suficiente para tipo específico"],
+      route: "extract_other",
+      security_flags: hasSensitiveSignals(combined),
+    };
+  }
+
+  return {
+    doc_type: found.type,
+    confidence: found.confidence,
+    reasons: ["Classificação por heurística de termos-chave"],
+    route: found.route,
+    security_flags: hasSensitiveSignals(combined),
+  };
+}
+
+function coerceRouteClassification(value: unknown, fallback: RouteClassificationOutput): RouteClassificationOutput {
+  if (!value || typeof value !== "object") {
+    return fallback;
+  }
+
+  const payload = value as {
+    doc_type?: unknown;
+    confidence?: unknown;
+    reasons?: unknown;
+    route?: unknown;
+    security_flags?: unknown;
+  };
+
+  const allowedDocTypes: RouteDocType[] = [
+    "BANK_STATEMENT",
+    "INVOICE",
+    "BOLETO",
+    "RECEIPT",
+    "CONTRACT",
+    "OTHER",
+    "REJECT",
+  ];
+
+  const docType =
+    typeof payload.doc_type === "string" &&
+    allowedDocTypes.includes(payload.doc_type as RouteDocType)
+      ? (payload.doc_type as RouteDocType)
+      : fallback.doc_type;
+
+  const securityFlags = Array.isArray(payload.security_flags)
+    ? payload.security_flags
+        .filter((item): item is RouteSecurityFlag =>
+          item === "PII_DETECTED" || item === "SUSPECTED_CREDENTIALS" || item === "NONE"
+        )
+    : fallback.security_flags;
+
+  return {
+    doc_type: docType,
+    confidence:
+      typeof payload.confidence === "number"
+        ? Math.max(0, Math.min(1, payload.confidence))
+        : fallback.confidence,
+    reasons: Array.isArray(payload.reasons)
+      ? payload.reasons.filter((item): item is string => typeof item === "string")
+      : fallback.reasons,
+    route:
+      typeof payload.route === "string" && payload.route.trim().length > 0
+        ? payload.route
+        : fallback.route,
+    security_flags: securityFlags.length > 0 ? securityFlags : ["NONE"],
   };
 }
 
@@ -440,6 +586,94 @@ export async function validateSemanticPostOcr(input: {
         error instanceof Error
           ? `semantic_validation_exception: ${error.message}`
           : "semantic_validation_exception",
+      ],
+    };
+  }
+}
+
+export async function classifyDocumentRoute(input: {
+  ocrJson: unknown;
+  fileMeta: {
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+  };
+  extractionText: string;
+}): Promise<{ routeClassification: RouteClassificationOutput; errors: string[] }> {
+  const fallback = fallbackRouteClassification({
+    text: input.extractionText,
+    fileName: input.fileMeta.fileName,
+  });
+
+  if (!hasAzureOpenAIConfig()) {
+    return {
+      routeClassification: fallback,
+      errors: ["azure_openai_not_configured_route_classification"],
+    };
+  }
+
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT!.replace(/\/$/, "");
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT!;
+  const apiKey = process.env.AZURE_OPENAI_API_KEY!;
+  const apiVersion = process.env.AZURE_OPENAI_API_VERSION!;
+  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+
+  const prompt = routeClassificationPrompt.prompt_template
+    .replace("{{ocr_json}}", JSON.stringify(input.ocrJson ?? {}, null, 2))
+    .replace("{{file_meta}}", JSON.stringify(input.fileMeta, null, 2));
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify({
+        temperature: routeClassificationPrompt.parameters.temperature,
+        top_p: routeClassificationPrompt.parameters.top_p,
+        max_tokens: routeClassificationPrompt.parameters.max_tokens,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "Retorne apenas JSON válido." },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      return {
+        routeClassification: fallback,
+        errors: [`route_classification_error: ${detail}`],
+      };
+    }
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+
+    const content = payload.choices?.[0]?.message?.content;
+    if (!content) {
+      return {
+        routeClassification: fallback,
+        errors: ["route_classification_empty_response"],
+      };
+    }
+
+    const parsed = JSON.parse(content) as unknown;
+    return {
+      routeClassification: coerceRouteClassification(parsed, fallback),
+      errors: [],
+    };
+  } catch (error) {
+    return {
+      routeClassification: fallback,
+      errors: [
+        error instanceof Error
+          ? `route_classification_exception: ${error.message}`
+          : "route_classification_exception",
       ],
     };
   }

@@ -1,0 +1,35 @@
+{
+  "name": "02_classificacao_documento",
+  "description": "Classifica o documento financeiro e detecta arquivos irrelevantes, indicando a rota de processamento.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "ocr_json": { "type": "object" },
+      "file_meta": { "type": "object" }
+    },
+    "required": ["ocr_json", "file_meta"]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "doc_type": {
+        "type": "string",
+        "enum": ["BANK_STATEMENT", "INVOICE", "BOLETO", "RECEIPT", "CONTRACT", "OTHER", "REJECT"]
+      },
+      "confidence": { "type": "number" },
+      "reasons": { "type": "array", "items": { "type": "string" } },
+      "route": { "type": "string" },
+      "security_flags": {
+        "type": "array",
+        "items": { "type": "string", "enum": ["PII_DETECTED", "SUSPECTED_CREDENTIALS", "NONE"] }
+      }
+    },
+    "required": ["doc_type", "confidence", "route"]
+  },
+  "prompt_template": "Classifique o documento em: BANK_STATEMENT, INVOICE, BOLETO, RECEIPT, CONTRACT, OTHER ou REJECT.\n- Use ocr_json (texto + campos) e file_meta (nome/tipo).\n- Marque REJECT quando for capa, página em branco, propaganda ou conteúdo irrelevante para finanças.\n- Retorne \"route\" sugerida (ex.: extract_bank_statement) ou \"skip\" para REJECT.\n- Popule \"security_flags\" com PII_DETECTED se houver dados sensíveis desnecessários (ex.: senha, chave privada).\n- Seja conservador: se houver dúvida entre BANK_STATEMENT e OTHER, escolha BANK_STATEMENT apenas quando constarem saldos e lançamentos.\n\nEntrada:\n- ocr_json: {{ocr_json}}\n- file_meta: {{file_meta}}\n\nSaída: JSON com doc_type, confidence (0–1), reasons[], route, security_flags[].\nSem texto fora do JSON.",
+  "parameters": {
+    "temperature": 0.0,
+    "top_p": 0.1,
+    "max_tokens": 400
+  }
+}

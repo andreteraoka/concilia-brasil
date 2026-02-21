@@ -69,6 +69,21 @@ export const outputSchema = z.object({
     ),
     needs_human_review: z.boolean(),
   }),
+  routeClassification: z.object({
+    doc_type: z.enum([
+      "BANK_STATEMENT",
+      "INVOICE",
+      "BOLETO",
+      "RECEIPT",
+      "CONTRACT",
+      "OTHER",
+      "REJECT",
+    ]),
+    confidence: z.number().min(0).max(1),
+    reasons: z.array(z.string()),
+    route: z.string().min(1),
+    security_flags: z.array(z.enum(["PII_DETECTED", "SUSPECTED_CREDENTIALS", "NONE"])),
+  }),
   azure: z.object({
     blobJsonUrl: z.string().nullable(),
     blobOriginalUrl: z.string().nullable(),
