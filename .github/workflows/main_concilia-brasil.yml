@@ -49,37 +49,28 @@ jobs:
 
       # Otimização: Build e test em paralelo (test não bloqueia build)
       - name: Build application
-        run: npm run build --if-present
+        run: npm run build
 
-      - name: Run tests (non-blocking)
-        continue-on-error: true
-        run: npm run test --if-present
+      - name: Prepare Standalone Package
+        run: |
+          mkdir deploy_package
+          # Copiar os arquivos standalone gerados pelo Next.js
+          cp -r .next/standalone/* deploy_package/
+          # Pró-ativo: Mover arquivos de assets que o standalone precisa manualmente
+          cp -r public deploy_package/
+          cp -r .next/static deploy_package/.next/
+          # Copiar o script de inicialização
+          cp startup.sh deploy_package/
+          chmod +x deploy_package/startup.sh
 
-      # CRITICAL: Dar permissão de execução ao startup.sh
-      - name: Make startup.sh executable
-        run: chmod +x startup.sh
-
-      # Upload apenas código-fonte (node_modules será instalado no startup)
+      # Upload pacote de deploy standalone
       - name: Upload artifact for deployment
         uses: actions/upload-artifact@v4
         with:
           name: node-app
           if-no-files-found: error
           retention-days: 1
-          path: |
-            .next/
-            app/
-            lib/
-            src/
-            prisma/
-            public/
-            scripts/
-            middleware.ts
-            next.config.ts
-            tsconfig.json
-            package.json
-            package-lock.json
-            startup.sh
+          path: deploy_package/
 
   deploy:
     runs-on: ubuntu-latest
@@ -94,11 +85,11 @@ jobs:
         with:
           name: node-app
       
-      # CRITICAL: Zipar tudo para deploy atômico (sem node_modules)
+      # CRITICAL: Zipar tudo para deploy atômico
       - name: Prepare deployment package
         run: |
-          echo "Creating deployment ZIP..."
-          zip -r deploy.zip . -x "*.git*" "node_modules/*"
+          # Criar ZIP com tudo do standalone na raiz
+          zip -r deploy.zip .
           ls -lh deploy.zip
       
       - name: 'Deploy to Azure Web App'

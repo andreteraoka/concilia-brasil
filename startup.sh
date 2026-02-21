@@ -1,57 +1,41 @@
 #!/bin/bash
 set -e  # Exit on error
 
-# Startup script para Concilia Brasil - Azure App Service Linux
+# === STARTUP CONVILHA BRASIL (STANDALONE MODE) ===
+# Script de inicialização otimizado para Azure App Service Linux
 # Logs disponíveis em: /home/LogFiles/startup.log
 
-echo "=== STARTUP: Iniciando Concilia Brasil ==="
+echo "⏳ Iniciando ambiente (Standalone Mode)..."
 echo "Timestamp: $(date)"
-echo "Node: $(node --version)"
-echo "npm: $(npm --version)"
-echo "Working directory: $(pwd)"
 
-# CRITICAL: Instalar dependências se node_modules estiver vazio/incompleto
-NODE_MODULES_SIZE=$(du -sm node_modules 2>/dev/null | cut -f1 || echo "0")
-echo "node_modules atual: ${NODE_MODULES_SIZE}MB"
-
-if [ "$NODE_MODULES_SIZE" -lt 500 ]; then
-  echo "⚠️  node_modules incompleto (${NODE_MODULES_SIZE}MB < 500MB esperado)"
-  echo "⏳ Instalando dependências com npm ci..."
-  npm ci --prefer-offline --no-audit
-  echo "✅ Dependências instaladas"
-else
-  echo "✅ node_modules OK (${NODE_MODULES_SIZE}MB)"
-fi
-
-# Verificar DATABASE_URL
+# CRITICAL: Migrations do Prisma
 if [ -z "$DATABASE_URL" ]; then
-  echo "⚠️  AVISO: DATABASE_URL não configurada"
+    echo "⚠️  AVISO: DATABASE_URL não encontrada. As migrations serão ignoradas."
 else
-  echo "✅ DATABASE_URL configurada"
-  
-  # Executar Prisma migrations
-  echo "⏳ Rodando Prisma migrations..."
-  npx prisma migrate deploy --skip-generate
-  
-  if [ $? -eq 0 ]; then
-    echo "✅ Migrations executadas"
-  else
-    echo "❌ ERRO nas migrations"
+    echo "⏳ Rodando Prisma migrations..."
+    # npx prisma migrate deploy --skip-generate
+    # Caso npx esteja lento, podemos usar o binário direto do prisma
+    ./node_modules/.bin/prisma migrate deploy --skip-generate
+    echo "✅ Migrations concluídas."
+fi
+
+# Ajuste de permissões (se necessário)
+chmod -R 755 .
+
+# CRITICAL: Inicializar Next.js Server
+# No modo standalone, o server.js está na raiz do pacote enviado.
+if [ -f "server.js" ]; then
+    echo "🚀 Servidor detectado. Iniciando node server.js..."
+    
+    # Pró-ativo: Azure espera tráfego na porta 8080 ou detecta a porta.
+    # O Next.js standalone usa a variável PORT ou padrão 3000.
+    export PORT="${PORT:-3000}"
+    echo "Escutando na porta: ${PORT}"
+    
+    exec node server.js
+else
+    echo "❌ erro: server.js não encontrado na raiz (/home/site/wwwroot/)."
+    echo "Verificando estrutura de arquivos:"
+    ls -la
     exit 1
-  fi
 fi
-
-# Verificar Prisma Client
-if [ ! -d "node_modules/.prisma" ]; then
-  echo "⏳ Gerando Prisma Client..."
-  npx prisma generate
-  echo "✅ Prisma Client gerado"
-else
-  echo "✅ Prisma Client já existe"
-fi
-
-echo "=== STARTUP CONCLUÍDO ==="
-echo "🚀 Iniciando Next.js server..."
-
-# CRITICAL: Iniciar o Next.js
-exec npm start
